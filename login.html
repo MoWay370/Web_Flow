@@ -126,17 +126,22 @@
     // ----------------------------
     // 1) Supabase 初始化：永遠不使用 const supabase = ...（避免 already declared）
     // ----------------------------
-    const { createClient } = window.supabase;
-
-    // 你的 Supabase 專案（保持你原本這組）
+    // Supabase 初始化（更強健：若 __sb 不是 Supabase client 就重建）
     const SUPABASE_URL = 'https://jqdtlkxvyrrpnbkyiigg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxZHRsa3h2eXJycG5ia3lpaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNTAwMTksImV4cCI6MjA2MzgyNjAxOX0.6ufrl0cNDT1LZqge0yTEGzzJ4IlYYubtKis2_ewkERw';
+    
+    const createClient = window.supabase && window.supabase.createClient;
+    if (!createClient) {
+      alert('Supabase SDK 載入失敗，請重新整理頁面或檢查網路');
+      throw new Error('Supabase SDK not loaded');
+    }
+    
+    // ✅ 如果 __sb 不存在，或不是 supabase client（沒有 auth），就重建
+    if (!window.__sb || !window.__sb.auth || typeof window.__sb.auth.signUp !== 'function') {
+      window.__sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
 
-    // ✅ 只建立一次 client（就算頁面因快取/重載也不會重複宣告）
-    window.__sb = window.__sb || createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // ✅ 以 sb 當作本頁唯一使用的 client 變數（不叫 supabase，徹底避開衝突）
-    const sb = window.__sb;
+const sb = window.__sb;
 
     // ----------------------------
     // 2) UI 工具函式
@@ -317,3 +322,4 @@
   </script>
 </body>
 </html>
+
