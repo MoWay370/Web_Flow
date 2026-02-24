@@ -33,9 +33,7 @@
       border-radius: 4px;
       transition: border-color 0.3s;
     }
-    input.invalid {
-      border-color: #ff4444;
-    }
+    input.invalid { border-color: #ff4444; }
     button {
       width: 100%;
       padding: 10px;
@@ -48,13 +46,8 @@
       cursor: pointer;
       transition: background 0.3s;
     }
-    button:hover {
-      background: #1565c0;
-    }
-    button:disabled {
-      background: #b0bec5;
-      cursor: not-allowed;
-    }
+    button:hover { background: #1565c0; }
+    button:disabled { background: #b0bec5; cursor: not-allowed; }
     .toggle-link {
       display: block;
       text-align: center;
@@ -89,6 +82,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <!-- 登入表單 -->
@@ -118,21 +112,25 @@
   </div>
 
   <script>
-    // 替換成你的 Supabase 設定
+    // Supabase 設定（保留原本 URL / KEY）
     const { createClient } = window.supabase;
     const SUPABASE_URL = 'https://jqdtlkxvyrrpnbkyiigg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxZHRsa3h2eXJycG5ia3lpaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNTAwMTksImV4cCI6MjA2MzgyNjAxOX0.6ufrl0cNDT1LZqge0yTEGzzJ4IlYYubtKis2_ewkERw';
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 表單切換
-    function toggleForms() {
+    // ✅ 只建立一次 client，避免 "already been declared"
+    window.sb = window.sb || createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ✅ 用一個固定變數名給後面用（你後面原本都寫 supabase.xxx）
+    const supabase = window.sb;
+
+    // ✅ 避免 inline onclick 找不到
+    window.toggleForms = function toggleForms() {
       document.getElementById('login-form').classList.toggle('hidden');
       document.getElementById('register-form').classList.toggle('hidden');
       clearMessages();
       clearInputErrors();
     }
 
-    // 清除所有訊息
     function clearMessages() {
       document.getElementById('login-message').textContent = '';
       document.getElementById('login-message').className = 'message';
@@ -140,7 +138,6 @@
       document.getElementById('register-message').className = 'message';
     }
 
-    // 清除輸入錯誤提示
     function clearInputErrors() {
       document.querySelectorAll('.input-error').forEach(el => {
         el.style.display = 'none';
@@ -150,21 +147,18 @@
       });
     }
 
-    // 顯示錯誤訊息
     function showError(elementId, message) {
       const element = document.getElementById(elementId);
       element.textContent = message;
       element.className = 'message error-message';
     }
 
-    // 顯示成功訊息
     function showSuccess(elementId, message) {
       const element = document.getElementById(elementId);
       element.textContent = message;
       element.className = 'message success-message';
     }
 
-    // 顯示輸入錯誤
     function showInputError(inputId, errorId, message) {
       document.getElementById(inputId).classList.add('invalid');
       const errorElement = document.getElementById(errorId);
@@ -177,12 +171,11 @@
       e.preventDefault();
       clearMessages();
       clearInputErrors();
-      
+
       const email = document.getElementById('login-email').value;
       const password = document.getElementById('login-password').value;
       const loginButton = document.getElementById('login-button');
-      
-      // 簡單驗證
+
       if (!email) {
         showInputError('login-email', 'login-email-error', '請輸入電子郵件');
         return;
@@ -191,30 +184,32 @@
         showInputError('login-password', 'login-password-error', '請輸入密碼');
         return;
       }
-      
+
       loginButton.disabled = true;
       loginButton.textContent = '登入中...';
-      
+
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ 
-          email, 
-          password 
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
         });
-        
+
         if (error) throw error;
-        
+
         showSuccess('login-message', '登入成功，正在跳轉...');
         console.log('登入使用者：', data);
-        
+
+        // ✅ 你用 Vercel rewrites，最穩是回到根目錄
         setTimeout(() => {
-          window.location.href = 'InhalerUI_V4.html';
-        }, 1000);
+          window.location.href = '/';
+        }, 600);
+
       } catch (error) {
         showError('login-message', '登入失敗：' + error.message);
-        
-        if (error.message.includes('email')) {
+
+        if ((error.message || '').includes('email')) {
           showInputError('login-email', 'login-email-error', '電子郵件錯誤');
-        } else if (error.message.includes('password')) {
+        } else if ((error.message || '').includes('password')) {
           showInputError('login-password', 'login-password-error', '密碼錯誤');
         }
       } finally {
@@ -228,13 +223,12 @@
       e.preventDefault();
       clearMessages();
       clearInputErrors();
-      
+
       const email = document.getElementById('register-email').value;
       const password = document.getElementById('register-password').value;
       const username = document.getElementById('register-username').value;
       const registerButton = document.getElementById('register-button');
-      
-      // 簡單驗證
+
       if (!email) {
         showInputError('register-email', 'register-email-error', '請輸入電子郵件');
         return;
@@ -243,49 +237,52 @@
         showInputError('register-password', 'register-password-error', '密碼至少需要6個字符');
         return;
       }
-      
+
       registerButton.disabled = true;
       registerButton.textContent = '註冊中...';
-      
+
       try {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              display_name: username ? username : null // or simply: username || null
+              display_name: username ? username : null
             }
           }
         });
-        
+
         if (error) throw error;
-        
-        // 嘗試創建用戶資料
+
+        // 嘗試建立 users 資料（失敗也不阻擋註冊流程）
         try {
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert([{ 
-              id: data.user.id, 
-              username: username || null 
-            }]);
-            
-          if (profileError) throw profileError;
+          if (data?.user?.id) {
+            const { error: profileError } = await supabase
+              .from('users')
+              .insert([{
+                id: data.user.id,
+                username: username || null
+              }]);
+
+            if (profileError) throw profileError;
+          }
         } catch (profileError) {
           console.error('用戶資料創建失敗:', profileError);
         }
-        
-        showSuccess('register-message', 
-          data.user.identities && data.user.identities.length > 0 
-            ? '註冊成功！請檢查您的電子郵件以確認帳號' 
-            : '註冊成功！請檢查您的電子郵件以確認帳號');
-        
+
+        showSuccess(
+          'register-message',
+          '註冊成功！請檢查您的電子郵件以確認帳號'
+        );
+
         console.log('註冊資料：', data);
+
       } catch (error) {
         showError('register-message', '註冊失敗：' + error.message);
-        
-        if (error.message.includes('email')) {
-          showInputError('register-email', 'register-email-error', '電子郵件已被使用');
-        } else if (error.message.includes('password')) {
+
+        if ((error.message || '').includes('email')) {
+          showInputError('register-email', 'register-email-error', '電子郵件已被使用或格式錯誤');
+        } else if ((error.message || '').includes('password')) {
           showInputError('register-password', 'register-password-error', '密碼強度不足');
         }
       } finally {
@@ -294,28 +291,28 @@
       }
     };
 
-    // 輸入時即時驗證
+    // 即時驗證
     document.getElementById('login-email').addEventListener('input', function() {
       if (this.value) {
         this.classList.remove('invalid');
         document.getElementById('login-email-error').style.display = 'none';
       }
     });
-    
+
     document.getElementById('login-password').addEventListener('input', function() {
       if (this.value) {
         this.classList.remove('invalid');
         document.getElementById('login-password-error').style.display = 'none';
       }
     });
-    
+
     document.getElementById('register-email').addEventListener('input', function() {
       if (this.value) {
         this.classList.remove('invalid');
         document.getElementById('register-email-error').style.display = 'none';
       }
     });
-    
+
     document.getElementById('register-password').addEventListener('input', function() {
       if (this.value && this.value.length >= 6) {
         this.classList.remove('invalid');
@@ -325,4 +322,3 @@
   </script>
 </body>
 </html>
-
