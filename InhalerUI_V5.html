@@ -106,7 +106,7 @@
       <h2>呼吸流量監測</h2>
     </div>
     <!-- Top-right login button -->
-    <button class="login-btn" id="loginBtn" title="登入以保存資料">登入帳號</button>
+    <button class="login-btn" id="loginBtn" title="醫院登入">登入帳號</button>
     <button class="myfiles-btn" id="myfilesBtn" title="點擊以查看資料">用藥紀錄</button>
     <button class="connect-btn" id="connectBtn" title="點擊名為USB Serial的裝置">連接裝置</button>
     <div class="greeting hidden" id="greeting"></div>
@@ -434,6 +434,7 @@ async function saveData() {
     return;
   }
 
+  // ----- 1) 組檔案內容 -----
   let content = `病患ID: ${id}\n身分證字號: ${name}\n\n`;
   if (budldValue) {
     content += `肺部沈積率 (BUDLD): ${budldValue.budld} µg\n`;
@@ -445,7 +446,7 @@ async function saveData() {
     content += `${time}\t${flow.toFixed(2)}\n`;
   });
 
-  // Format datetime as yyyymmddhhmm
+  // ----- 2) 產生檔名 -----
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -453,42 +454,38 @@ async function saveData() {
   const hh = String(now.getHours()).padStart(2, '0');
   const min = String(now.getMinutes()).padStart(2, '0');
   const datetime = `${yyyy}${mm}${dd}${hh}${min}`;
-
-  // Use name_datetime.txt as filename
   const fileName = `${name}_${datetime}.txt`;
 
-  // ✅ Get logged-in user's UID
-  const {
-    data: { user },
-    error: userError
-  } = await supabaseClient.auth.getUser();
-
-  if (userError || !user) {
-    alert('請先登入才能上傳檔案');
-    return;
-  }
-
-  const uid = user.id;
-  const filePath = `${uid}/${fileName}`; // ✅ Upload under folder matching UID
-
-  // Optional local download
+  // ----- 3) 建 Blob -----
   const blob = new Blob([content], { type: "text/plain" });
+
+  // ✅ 4) 先本機下載：不需要登入
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(a.href);
 
-  // ✅ Upload to Supabase under UID folder
-  const { error } = await supabaseClient
+  // ✅ 5) 再判斷是否登入：登入才上傳
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  if (userError || !user) {
+    alert('已下載到本機；若要自動上傳到雲端，請先登入帳號。');
+    return;
+  }
+
+  const uid = user.id;
+  const filePath = `${uid}/${fileName}`;
+
+  // ✅ 6) 上傳到 Supabase Storage
+  const { error: uploadError } = await supabaseClient
     .storage
     .from('records')
     .upload(filePath, blob);
 
-  if (error) {
-    alert('上傳失敗：' + error.message);
+  if (uploadError) {
+    alert('已下載到本機，但上傳失敗：' + uploadError.message);
   } else {
-    alert('儲存與上傳成功！檔案路徑為：' + filePath);
+    alert('已下載到本機，並上傳成功！檔案路徑：' + filePath);
   }
 }
 
@@ -499,5 +496,6 @@ setStep(0);
 </script>
 </body>
 </html>
+
 
 
