@@ -24,8 +24,14 @@
     .delete-btn:hover { background: #c0392b; }
     .view-btn { color: #fff; background: #1abc68; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-left: 8px; }
     .view-btn:hover { background: #159c54; }
+
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; height: auto; float: none; padding: 16px 0; }
+      .main { margin-left: 0; padding: 16px; }
+    }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <!-- 用固定版本，避免 CDN 變動造成 window.supabase 不存在 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="sidebar">
@@ -39,6 +45,7 @@
     </ul>
     <div class="logout" onclick="logout()">登出</div>
   </div>
+
   <div class="main">
     <h1>我的檔案</h1>
     <div class="search-bar">
@@ -58,6 +65,7 @@
       </tbody>
     </table>
   </div>
+
   <!-- 檔案內容檢視 Modal -->
   <div id="fileModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:1000;">
     <div style="background:#fff; padding:24px; border-radius:8px; max-width:600px; width:90%; max-height:80vh; overflow:auto; position:relative;">
@@ -74,68 +82,105 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_UlV7BQ7w-bmWVhALsfR9tA_qXAwDgYg';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // ✅ 自動抓 GitHub Pages repo base path（避免 /login.html 跳到 github.io 根目錄）
+    function basePath() {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      // /FLOWmeter/userTable.html -> parts[0] = FLOWmeter
+      return parts.length > 0 ? `/${parts[0]}/` : '/';
+    }
+
     let user = null;
     let allFiles = [];
 
     async function getUserAndFiles() {
-      // 取得目前使用者
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
-        window.location.href = '/login.html';
-        return;
-      }
-      user = currentUser;
-      document.getElementById('user-name').textContent = user.user_metadata?.display_name || user.email;
-      document.getElementById('user-id').textContent = 'ID: ' + user.id;
-      document.getElementById('user-avatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata?.display_name || user.email)}`;
+      try {
+        // 取得目前使用者
+        const { data: { user: currentUser }, error: userErr } = await supabase.auth.getUser();
+        if (userErr) {
+          console.error(userErr);
+        }
 
-      // 取得使用者資料夾下所有 txt 檔案
-      const { data, error } = await supabase
-        .storage
-        .from('records')
-        .list(user.id, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+        if (!currentUser) {
+          // 沒登入就導回登入頁（GitHub Pages 需要 basePath）
+          window.location.href = basePath() + 'login.html';
+          return;
+        }
 
-      if (error) {
-        alert('載入檔案時發生錯誤：' + error.message);
-        return;
+        user = currentUser;
+
+        const displayName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.email || '使用者';
+        document.getElementById('user-name').textContent = displayName;
+        document.getElementById('user-id').textContent = 'ID: ' + user.id;
+        document.getElementById('user-avatar').src =
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}`;
+
+        // 取得使用者資料夾下所有 txt 檔案
+        const { data, error } = await supabase
+          .storage
+          .from('records')
+          .list(user.id, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+
+        if (error) {
+          console.error(error);
+          alert('載入檔案時發生錯誤：' + error.message);
+          return;
+        }
+
+        // 只顯示 .txt 檔案
+        allFiles = (data || []).filter(f => (f.name || '').toLowerCase().endsWith('.txt'));
+        renderFiles();
+
+      } catch (e) {
+        console.error(e);
+        alert('頁面初始化失敗，請開啟 F12 Console 查看錯誤。');
       }
-      // 只顯示 .txt 檔案
-      allFiles = (data || []).filter(f => f.name.endsWith('.txt'));
-      renderFiles();
     }
 
     function renderFiles() {
       const search = document.getElementById('search').value.toLowerCase();
       const list = document.getElementById('files-list');
       list.innerHTML = '';
-      allFiles
-        .filter(f => f.name.toLowerCase().includes(search))
-        .forEach(file => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${file.name}</td>
-            <td>${file.metadata?.size ? (file.metadata.size / 1024).toFixed(1) + ' KB' : ''}</td>
-            <td>${file.updated_at ? file.updated_at.split('T')[0] : ''}</td>
-            <td>
-              <button class="view-btn" onclick="viewFile('${file.name.replace(/'/g, "\\'")}')">檢視</button>
-              <button class="delete-btn" onclick="deleteFile('${file.name.replace(/'/g, "\\'")}')">刪除</button>
-            </td>
-          `;
-          list.appendChild(tr);
-        });
+
+      const filtered = allFiles.filter(f => (f.name || '').toLowerCase().includes(search));
+
+      if (filtered.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="4" style="text-align:center;color:#888;padding:18px;">沒有符合的檔案</td>`;
+        list.appendChild(tr);
+        return;
+      }
+
+      filtered.forEach(file => {
+        const safeName = (file.name || '').replace(/'/g, "\\'");
+        const sizeKB = file.metadata?.size ? (file.metadata.size / 1024).toFixed(1) + ' KB' : '';
+        const updated = file.updated_at ? file.updated_at.split('T')[0] : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${file.name}</td>
+          <td>${sizeKB}</td>
+          <td>${updated}</td>
+          <td>
+            <button class="view-btn" onclick="viewFile('${safeName}')">檢視</button>
+            <button class="delete-btn" onclick="deleteFile('${safeName}')">刪除</button>
+          </td>
+        `;
+        list.appendChild(tr);
+      });
     }
 
     async function viewFile(fileName) {
-      // 從 Supabase Storage 下載檔案
       const { data, error } = await supabase
         .storage
         .from('records')
         .download(`${user.id}/${fileName}`);
+
       if (error) {
+        console.error(error);
         alert('下載檔案時發生錯誤：' + error.message);
         return;
       }
-      // 以文字方式顯示內容
+
       const text = await data.text();
       document.getElementById('modalFileName').textContent = fileName;
       document.getElementById('modalFileContent').textContent = text;
@@ -155,10 +200,11 @@
         .remove([`${user.id}/${fileName}`]);
 
       if (error) {
+        console.error(error);
         alert('刪除檔案時發生錯誤：' + error.message);
         return;
       }
-      // 從 allFiles 移除該檔案並重新渲染
+
       allFiles = allFiles.filter(f => f.name !== fileName);
       renderFiles();
       alert('檔案已刪除');
@@ -166,11 +212,17 @@
 
     async function logout() {
       await supabase.auth.signOut();
-      window.location.href = 'InhalerUI_V4.html';
+      // 登出後回主頁（依你的檔名調整）
+      window.location.href = basePath() + 'InhalerUI_V4.html';
     }
 
+    // ✅ 監聽登入狀態變化：登入/登出後 UI 會自動更新
+    supabase.auth.onAuthStateChange(() => {
+      getUserAndFiles();
+    });
+
+    // 初始載入
     getUserAndFiles();
   </script>
 </body>
 </html>
-
