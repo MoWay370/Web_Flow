@@ -14,7 +14,6 @@
     .row input { flex: 1; padding: 8px; border: 1px solid #cce0cc; border-radius: 6px; }
     .save-btn { background: #1abc68; color: #fff; border: none; border-radius: 6px; padding: 10px 24px; font-size: 16px; cursor: pointer; margin-top: 16px; }
     .login-btn { background: #4e7fff; color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
-    .myfiles-btn { background: #4e7fff; color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
     .connect-btn { background: #4e7fff; color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
     .greeting { font-size: 1.2em; margin-bottom: 24px; color: #1abc68; }
     .status { font-size: 18px; margin: 10px 0 0 0; color: #1abc68; }
@@ -38,16 +37,15 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      /* 這裡不再設 max-width，交由圖片本身控制 */
     }
     .imgbox img {
-      height: 270px;      /* 統一高度 */
-      width: auto;        /* 保持比例 */
+      height: 270px;
+      width: auto;
       object-fit: contain;
       background: #f7faf7;
       border-radius: 10px;
       box-shadow: 0 1px 4px #e0e0e0;
-      max-width: 280px;   /* 防止過寬 */
+      max-width: 280px;
       display: block;
     }
     .imgbox .caption {
@@ -60,8 +58,8 @@
     /* 肺部圖像區塊 */
     #lungsBox {
       display: none;
-      width: 267px;   /* 534/2 */
-      height: 234px;  /* 467/2 */
+      width: 267px;
+      height: 234px;
       margin: 24px auto 0 auto;
       position: relative;
       background: #f7faf7;
@@ -100,44 +98,53 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
       <h2>呼吸流量監測</h2>
     </div>
-    <!-- Top-right login button -->
+
+    <!-- 登入按鈕（保留） -->
     <button class="login-btn" id="loginBtn" title="登入帳號">醫院登入</button>
-    <button class="myfiles-btn" id="myfilesBtn" title="點擊以查看資料">用藥紀錄</button>
+
+    <!-- ✅ 用藥紀錄按鈕已移除 -->
+
     <button class="connect-btn" id="connectBtn" title="點擊名為USB Serial的裝置">連接裝置</button>
+
     <div class="greeting hidden" id="greeting"></div>
     <div id="usbHint">點擊名為USB Serial的裝置</div>
     <div id="status" class="status"></div>
+
     <div class="lights" id="lights">
       <div class="light grey" id="light1"></div>
       <div class="light grey" id="light2"></div>
       <div class="light grey" id="light3"></div>
     </div>
-    <!-- 圖片區塊 -->
-    <div class="image-row" id="stepImages">
-      <!-- 動態插入圖片 -->
-    </div>
+
+    <div class="image-row" id="stepImages"></div>
+
     <div class="chart-container" id="chartBox">
       <canvas id="flowChart"></canvas>
     </div>
-    <!-- 肺部沈積率圖像 -->
+
     <div id="lungsBox">
       <img src="img/lungs.png" id="lungsImg" width="267" height="234" alt="肺部圖像">
       <div id="lungsFill"></div>
       <div id="lungsPercent"></div>
     </div>
+
     <div>
       <span>流量：</span><span id="flowValue">0.00</span>
     </div>
+
     <div id="instruction" class="status"></div>
+
     <div class="row" style="margin-top: 20px;">
       <input id="patientId" placeholder="病患編號" />
       <input id="patientName" placeholder="病患身分證字號" />
     </div>
+
     <button class="save-btn" id="saveBtn">儲存資料</button>
   </div>
 
@@ -148,20 +155,17 @@ const SUPABASE_ANON_KEY = 'sb_publishable_UlV7BQ7w-bmWVhALsfR9tA_qXAwDgYg';
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const greeting = document.getElementById('greeting');
-const myfilesBtn = document.getElementById('myfilesBtn');
 const loginBtn = document.getElementById('loginBtn');
 
-// Check login state on load
+// Check login state on load（✅ 已移除 myfilesBtn 相關控制）
 async function checkLogin() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   if (user) {
     greeting.textContent = `Hello, ${user.user_metadata?.full_name || user.email || 'User'}!`;
     greeting.classList.remove('hidden');
-    myfilesBtn.classList.remove('hidden');
     loginBtn.classList.add('hidden');
   } else {
     greeting.classList.add('hidden');
-    myfilesBtn.classList.add('hidden');
     loginBtn.classList.remove('hidden');
   }
 }
@@ -173,23 +177,18 @@ const instructions = [
   "吸入器使用完成，裝置將於10秒後關閉。"
 ];
 
-// 動態圖片資料（等高縮放）
 const stepImagesData = [
-  // step 0
   [
     { src: "img/lidOff_correct.png", alt: "取下吸入器蓋子", caption: "取下吸入器蓋子" },
     { src: "img/clockwise.png", alt: "順時針旋轉", caption: "插入裝置底座順時針旋轉" }
   ],
-  // step 1
   [
     { src: "img/lidOff_highRes.png", alt: "取下吸入器蓋子", caption: "取下吸入器蓋子" },
     { src: "img/counterclockwise.png", alt: "逆時針旋轉", caption: "逆時針旋轉" }
   ],
-  // step 2
   [
     { src: "img/breatheOutandIn.png", alt: "吐氣吸氣示意", caption: "吐氣3秒後深吸3秒" }
   ],
-  // step 3
   []
 ];
 
@@ -211,6 +210,7 @@ let chartData = {
     tension: 0.3
   }]
 };
+
 const flowChart = new Chart(ctx, {
   type: 'line',
   data: chartData,
@@ -227,15 +227,15 @@ const flowChart = new Chart(ctx, {
 });
 
 const observer = new ResizeObserver(() => {
-flowChart.resize();
+  flowChart.resize();
 });
 observer.observe(document.getElementById('chartBox'));
 
 let serialPort, reader;
 let startTime = null;
 let flowRecords = [];
-let currentStep = 0; // 0:初始, 1:Phase1, 2:Phase2, 3:完成
-let flowData = []; // [[時間, flow值]]
+let currentStep = 0;
+let flowData = [];
 let lastFlowTime = 0;
 let budldValue = null;
 let budldTimer = null;
@@ -248,7 +248,6 @@ function setStep(step) {
     lightEl.className = 'light ' + lights[i];
   }
 
-  // 動態插入圖片，統一高度180px，寬度自動
   const stepImages = document.getElementById('stepImages');
   stepImages.innerHTML = '';
   stepImages.style.display = (stepImagesData[step].length > 0) ? 'flex' : 'none';
@@ -265,11 +264,8 @@ function setStep(step) {
 
   document.getElementById('chartBox').style.display = (step === 3 ? 'block' : 'none');
   document.getElementById('lungsBox').style.display = 'none';
-
-  // 指示
   document.getElementById('instruction').innerHTML = instructions[step];
 
-  // 步驟3時啟動BUDLD計算監聽
   if (step === 3) {
     if (budldTimer) clearInterval(budldTimer);
     budldTimer = setInterval(() => {
@@ -288,19 +284,15 @@ function setStep(step) {
 }
 
 function showLungFill(budld) {
-  const percent = Math.max(0, Math.min(1, budld/160));
-  const percentText = `${Math.round(percent*100)}%`;
+  const percent = Math.max(0, Math.min(1, budld / 160));
+  const percentText = `${Math.round(percent * 100)}%`;
   document.getElementById('lungsBox').style.display = 'block';
-  document.getElementById('lungsFill').style.height = (percent*100) + '%';
+  document.getElementById('lungsFill').style.height = (percent * 100) + '%';
   document.getElementById('lungsPercent').innerText = percentText;
 }
 
 document.getElementById("loginBtn").onclick = function() {
-    window.location.href = "login.html";
-};
-
-document.getElementById("myfilesBtn").onclick = function() {
-    window.location.href = "userTable.html";
+  window.location.href = "login.html";
 };
 
 document.getElementById('connectBtn').onclick = async function () {
@@ -337,33 +329,20 @@ async function listenSerial() {
 }
 
 function handleSerialLine(line) {
-  // 狀態判斷（部分比對）
-  if (line.includes("Phase 1 complete!")) {
-    setStep(1);
-    return;
-  }
-  if (line.includes("Phase 2 complete!!")) {
-    setStep(2);
-    return;
-  }
-  if (line.includes("Phase 4 complete!!!")) {
-    setStep(3);
-    return;
-  }
-  // 流量數據
+  if (line.includes("Phase 1 complete!")) { setStep(1); return; }
+  if (line.includes("Phase 2 complete!!")) { setStep(2); return; }
+  if (line.includes("Phase 4 complete!!!")) { setStep(3); return; }
+
   const match = line.match(/Flow[:：]\s*([0-9.]+)/i);
   if (match) {
-    if (currentStep === 2) {
-      // step 2 正常接收 flow
-    } else if (currentStep < 2) {
-      setStep(2);
-    }
-    // step 3 時收到 flow，不切換 step
+    if (currentStep < 2) setStep(2);
+
     const flow = parseFloat(match[1]);
     const now = ((Date.now() - startTime) / 1000).toFixed(2);
     lastFlowTime = Date.now();
     flowData.push([parseFloat(now), flow]);
     document.getElementById('flowValue').innerText = flow.toFixed(2);
+
     chartData.labels.push(now);
     chartData.datasets[0].data.push(flow);
     if (chartData.labels.length > 80) {
@@ -378,7 +357,6 @@ function handleSerialLine(line) {
 function calculateBUDLD() {
   if (flowData.length === 0) return null;
 
-  // Find all continuous segments where flow > 0
   let segments = [];
   let start = null;
   for (let i = 0; i < flowData.length; i++) {
@@ -392,10 +370,8 @@ function calculateBUDLD() {
     }
   }
   if (start !== null) segments.push([start, flowData.length - 1]);
-
   if (segments.length === 0) return null;
 
-  // Find the segment with the largest sum of flow
   let maxSum = -Infinity, maxSegment = null;
   for (const [segStart, segEnd] of segments) {
     const segData = flowData.slice(segStart, segEnd + 1);
@@ -406,18 +382,19 @@ function calculateBUDLD() {
     }
   }
 
-  // Use the largest segment for calculations
   const usedData = flowData.slice(maxSegment[0], maxSegment[1] + 1);
   const sumFlow = usedData.reduce((sum, d) => sum + d[1], 0);
   const peakFlow = Math.max(...usedData.map(d => d[1]));
   const risingTime = usedData.length * 0.2;
   const inhaledVolume = sumFlow * 0.2 / 60;
+
   const budld = 160 * (
     0.146661033
     - 0.057608304 * risingTime
     + 0.00475804 * peakFlow
     + 0.077573091 * inhaledVolume
   );
+
   return {
     budld: budld.toFixed(2),
     peakFlow: peakFlow.toFixed(2),
@@ -434,7 +411,6 @@ async function saveData() {
     return;
   }
 
-  // ----- 1) 組檔案內容 -----
   let content = `病患ID: ${id}\n身分證字號: ${name}\n\n`;
   if (budldValue) {
     content += `肺部沈積率 (BUDLD): ${budldValue.budld} µg\n`;
@@ -446,7 +422,6 @@ async function saveData() {
     content += `${time}\t${flow.toFixed(2)}\n`;
   });
 
-  // ----- 2) 產生檔名 -----
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -456,17 +431,16 @@ async function saveData() {
   const datetime = `${yyyy}${mm}${dd}${hh}${min}`;
   const fileName = `${name}_${datetime}.txt`;
 
-  // ----- 3) 建 Blob -----
   const blob = new Blob([content], { type: "text/plain" });
 
-  // ✅ 4) 先本機下載：不需要登入
+  // 先本機下載（不需登入）
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(a.href);
 
-  // ✅ 5) 再判斷是否登入：登入才上傳
+  // 登入才上傳
   const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
   if (userError || !user) {
     alert('已下載到本機；若要自動上傳到雲端，請先登入帳號。');
@@ -476,7 +450,6 @@ async function saveData() {
   const uid = user.id;
   const filePath = `${uid}/${fileName}`;
 
-  // ✅ 6) 上傳到 Supabase Storage
   const { error: uploadError } = await supabaseClient
     .storage
     .from('records')
@@ -493,10 +466,10 @@ document.getElementById('saveBtn').addEventListener('click', saveData);
 
 // 預設初始狀態
 setStep(0);
+
+// 建議：一載入就同步登入狀態
+checkLogin();
+supabaseClient.auth.onAuthStateChange(() => checkLogin());
 </script>
 </body>
 </html>
-
-
-
-
