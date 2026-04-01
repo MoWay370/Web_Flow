@@ -357,10 +357,13 @@ function handleSerialLine(line) {
 function calculateBUDLD() {
   if (flowData.length === 0) return null;
 
+  // 只計算 flow > 20 的資料點（過濾背景噪音）
+  const FLOW_THRESHOLD = 20;
+
   let segments = [];
   let start = null;
   for (let i = 0; i < flowData.length; i++) {
-    if (flowData[i][1] > 0) {
+    if (flowData[i][1] > FLOW_THRESHOLD) {
       if (start === null) start = i;
     } else {
       if (start !== null) {
@@ -372,15 +375,32 @@ function calculateBUDLD() {
   if (start !== null) segments.push([start, flowData.length - 1]);
   if (segments.length === 0) return null;
 
+  // 取總和最大的段
   let maxSum = -Infinity, maxSegment = null;
   for (const [segStart, segEnd] of segments) {
-    const segData = flowData.slice(segStart, segEnd + 1);
-    const segSum = segData.reduce((sum, d) => sum + d[1], 0);
-    if (segSum > maxSum) {
-      maxSum = segSum;
-      maxSegment = [segStart, segEnd];
-    }
+    const segSum = flowData.slice(segStart, segEnd + 1).reduce((s, d) => s + d[1], 0);
+    if (segSum > maxSum) { maxSum = segSum; maxSegment = [segStart, segEnd]; }
   }
+
+  const usedData = flowData.slice(maxSegment[0], maxSegment[1] + 1);
+  const sumFlow = usedData.reduce((s, d) => s + d[1], 0);
+  const peakFlow = Math.max(...usedData.map(d => d[1]));
+  const risingTime = usedData.length * 0.2;
+  const inhaledVolume = sumFlow * 0.2 / 60;
+
+  const budld = 160 * (
+    0.146661033
+    - 0.057608304 * risingTime
+    + 0.00475804  * peakFlow
+    + 0.077573091 * inhaledVolume
+  );
+
+  return {
+    budld: budld.toFixed(2),
+    peakFlow: peakFlow.toFixed(2),
+    risingTime: risingTime.toFixed(1)
+  };
+}
 
   const usedData = flowData.slice(maxSegment[0], maxSegment[1] + 1);
   const sumFlow = usedData.reduce((sum, d) => sum + d[1], 0);
