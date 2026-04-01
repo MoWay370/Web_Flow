@@ -1,306 +1,459 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <title>登入或註冊</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+  <meta charset="UTF-8">
+  <title>呼吸流量監測</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: Arial, "Microsoft JhengHei", "微軟正黑體", "PMingLiU", "新細明體", sans-serif;
-      background: #f5f5f5;
-      margin: 0;
-      padding: 0;
+    body { font-family: 'Noto Sans TC', Arial, sans-serif; background: #f7faf7; margin: 0; }
+    .container { max-width: 800px; margin: 40px auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px #d0e2d0; padding: 32px; }
+    .header { display: flex; justify-content: space-between; align-items: center; }
+    .chart-container { position:relative; aspect-ratio:2/1; width:100%; max-width:600px; margin:0 auto; }
+    .row { display: flex; gap: 16px; }
+    .row input { flex: 1; padding: 8px; border: 1px solid #cce0cc; border-radius: 6px; }
+    .save-btn { background: #1abc68; color: #fff; border: none; border-radius: 6px; padding: 10px 24px; font-size: 16px; cursor: pointer; margin-top: 16px; }
+    .login-btn { background: #4e7fff; color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
+    .connect-btn { background: #4e7fff; color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
+    .greeting { font-size: 1.2em; margin-bottom: 24px; color: #1abc68; }
+    .status { font-size: 18px; margin: 10px 0 0 0; color: #1abc68; }
+    .lights { display: flex; gap: 16px; margin: 16px 0; }
+    .light { width: 32px; height: 32px; border-radius: 50%; background: #ccc; border: 2px solid #bbb; }
+    .light.red { background: #ff4b33; box-shadow: 0 0 8px #ff4b33; }
+    .light.green { background: #00ffe8; box-shadow: 0 0 8px #00ffe8; }
+    .light.grey { background: #ccc; }
+    #usbHint { margin-top:10px; padding:10px; background:#f0f8ff; border-radius:6px; color:#333; border:1px solid #b2dfdb; }
+
+    .image-row {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 18px;
+      margin: 12px 0 12px 0;
+      flex-wrap: wrap;
     }
-    .container {
-      max-width: 350px;
-      margin: 60px auto;
-      background: #fff;
-      border-radius: 8px;
-      padding: 30px 25px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    .imgbox {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    h2 {
-      text-align: center;
-      margin-bottom: 18px;
-      color: #1976d2;
-    }
-    input[type="text"], input[type="password"], input[type="email"] {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0 16px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      transition: border-color 0.3s;
-      box-sizing: border-box;
-    }
-    input.invalid { border-color: #ff4444; }
-    button {
-      width: 100%;
-      padding: 10px;
-      background: #1976d2;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 16px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-    button:hover { background: #1565c0; }
-    button:disabled { background: #b0bec5; cursor: not-allowed; }
-    .toggle-link {
+    .imgbox img {
+      height: 270px;
+      width: auto;
+      object-fit: contain;
+      background: #f7faf7;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px #e0e0e0;
+      max-width: 280px;
       display: block;
+    }
+    .imgbox .caption {
+      font-size: 14px;
+      color: #888;
+      margin-top: 4px;
       text-align: center;
-      margin-top: 12px;
-      color: #1976d2;
-      cursor: pointer;
-      text-decoration: underline;
+    }
+
+    #lungsBox {
+      display: none;
+      width: 267px;
+      height: 234px;
+      margin: 24px auto 0 auto;
+      position: relative;
+      background: #f7faf7;
+      border-radius: 20px;
+      box-shadow: 0 2px 8px #d0e2d0;
+    }
+    #lungsImg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      position: relative;
+      z-index: 2;
+      pointer-events: none;
       user-select: none;
     }
-    .hidden { display: none; }
-    .message {
-      text-align: center;
-      margin-top: 10px;
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 14px;
-      white-space: pre-line; /* 支援換行顯示 */
+    #lungsFill {
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 100%;
+      height: 0%;
+      background: rgba(30,200,200,0.6);
+      z-index: 1;
+      transition: height 1s;
+      border-radius: 0 0 36px 36px;
+      pointer-events: none;
     }
-    .error-message {
-      color: #ff4444;
-      background-color: #ffebee;
-      border: 1px solid #ffcdd2;
+    #lungsPercent {
+      position: absolute; left:0; right:0; bottom:10px; text-align:center; color:#1abc68; font-weight:bold; font-size:18px; z-index:3;
+      text-shadow:0 0 6px #fff;
+      pointer-events: none;
     }
-    .success-message {
-      color: #00C851;
-      background-color: #e8f5e9;
-      border: 1px solid #c8e6c9;
-    }
-    .warn-message {
-      color: #e65100;
-      background-color: #fff3e0;
-      border: 1px solid #ffe0b2;
-      line-height: 1.6;
-    }
-    .input-error {
-      color: #ff4444;
-      font-size: 12px;
-      margin-top: -12px;
-      margin-bottom: 12px;
-      display: none;
+    @media (max-width: 600px) {
+      .container { padding: 8px; }
+      .image-row { flex-direction: column; align-items: center; }
+      .imgbox img { max-width: 98vw; }
     }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <!-- 登入表單 -->
-    <form id="login-form">
-      <h2>登入</h2>
-      <input type="email" id="login-email" placeholder="電子郵件" required />
-      <div id="login-email-error" class="input-error">請輸入有效的電子郵件</div>
+    <div class="header">
+      <h2>呼吸流量監測</h2>
+    </div>
 
-      <input type="password" id="login-password" placeholder="密碼" required />
-      <div id="login-password-error" class="input-error">請輸入密碼</div>
+    <button class="login-btn" id="loginBtn" title="登入帳號">醫院登入</button>
+    <button class="connect-btn" id="connectBtn" title="點擊名為USB Serial的裝置">連接裝置</button>
 
-      <button type="submit" id="login-button">登入</button>
-      <span class="toggle-link" onclick="toggleForms()">沒有帳號？註冊</span>
-      <div id="login-message" class="message"></div>
-    </form>
+    <div class="greeting hidden" id="greeting"></div>
+    <div id="usbHint">點擊名為USB Serial的裝置</div>
+    <div id="status" class="status"></div>
 
-    <!-- 註冊表單 -->
-    <form id="register-form" class="hidden">
-      <h2>註冊</h2>
-      <input type="text" id="register-username" placeholder="用戶名稱（可略過）" />
+    <div class="lights" id="lights">
+      <div class="light grey" id="light1"></div>
+      <div class="light grey" id="light2"></div>
+      <div class="light grey" id="light3"></div>
+    </div>
 
-      <input type="email" id="register-email" placeholder="電子郵件" required />
-      <div id="register-email-error" class="input-error">請輸入有效的電子郵件</div>
+    <div class="image-row" id="stepImages"></div>
 
-      <input type="password" id="register-password" placeholder="密碼（至少 6 碼）" required />
-      <div id="register-password-error" class="input-error">密碼至少需要6個字符</div>
+    <div class="chart-container" id="chartBox" style="display:none;">
+      <canvas id="flowChart"></canvas>
+    </div>
 
-      <button type="submit" id="register-button">註冊</button>
-      <span class="toggle-link" onclick="toggleForms()">已有帳號？登入</span>
-      <div id="register-message" class="message"></div>
-    </form>
+    <div id="lungsBox">
+      <img src="img/lungs.png" id="lungsImg" width="267" height="234" alt="肺部圖像">
+      <div id="lungsFill"></div>
+      <div id="lungsPercent"></div>
+    </div>
+
+    <div>
+      <span>流量：</span><span id="flowValue">0.00</span>
+    </div>
+
+    <div id="instruction" class="status"></div>
+
+    <div class="row" style="margin-top: 20px;">
+      <input id="patientId" placeholder="病患編號" />
+      <input id="patientName" placeholder="病患身分證字號" />
+    </div>
+
+    <button class="save-btn" id="saveBtn">儲存資料</button>
   </div>
 
-  <script>
-    console.log("LOGIN VERSION = FLOWMETER-2");
+<script>
+const { createClient } = window.supabase;
+const SUPABASE_URL = 'https://nwqbmvletfxarabeaivm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_UlV7BQ7w-bmWVhALsfR9tA_qXAwDgYg';
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ----------------------------
-    // 1) Supabase 初始化
-    // ----------------------------
-    const SUPABASE_URL = 'https://nwqbmvletfxarabeaivm.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_UlV7BQ7w-bmWVhALsfR9tA_qXAwDgYg';
+const greeting = document.getElementById('greeting');
+const loginBtn = document.getElementById('loginBtn');
 
-    const createClient = window.supabase && window.supabase.createClient;
-    if (!createClient) {
-      alert('Supabase SDK 載入失敗，請重新整理頁面或檢查網路');
-      throw new Error('Supabase SDK not loaded');
+async function checkLogin() {
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (user) {
+    greeting.textContent = `Hello, ${user.user_metadata?.full_name || user.email || 'User'}!`;
+    greeting.classList.remove('hidden');
+    loginBtn.classList.add('hidden');
+  } else {
+    greeting.classList.add('hidden');
+    loginBtn.classList.remove('hidden');
+  }
+}
+
+const instructions = [
+  "請先取下吸入器蓋子，然後放置吸入器。若燈未亮，請向左（順時針）旋轉，左側第一顆指示燈應亮綠色。",
+  "請確定吸入器蓋子已取下，然後向右（逆時針）旋轉以釋放劑量，第二顆燈應亮綠色。",
+  "現在可以吸入藥劑：<br>請將吸嘴含入口中，用力深吸，移開吸入器並屏住呼吸約10秒。",
+  "吸入器使用完成，裝置將於10秒後關閉。"
+];
+
+const stepImagesData = [
+  [
+    { src: "img/lidOff_correct.png", alt: "取下吸入器蓋子", caption: "取下吸入器蓋子" },
+    { src: "img/clockwise.png", alt: "順時針旋轉", caption: "插入裝置底座順時針旋轉" }
+  ],
+  [
+    { src: "img/lidOff_highRes.png", alt: "取下吸入器蓋子", caption: "取下吸入器蓋子" },
+    { src: "img/counterclockwise.png", alt: "逆時針旋轉", caption: "逆時針旋轉" }
+  ],
+  [
+    { src: "img/breatheOutandIn.png", alt: "吐氣吸氣示意", caption: "吐氣3秒後深吸3秒" }
+  ],
+  []
+];
+
+const lightModes = [
+  ['grey', 'grey', 'grey'],
+  ['green', 'red',  'red' ],
+  ['green', 'green','red' ],
+  ['green', 'green','green']
+];
+
+const ctx = document.getElementById('flowChart').getContext('2d');
+let chartData = {
+  labels: [],
+  datasets: [{
+    label: 'Flow',
+    data: [],
+    borderColor: '#1abc68',
+    fill: false,
+    tension: 0.3
+  }]
+};
+
+const flowChart = new Chart(ctx, {
+  type: 'line',
+  data: chartData,
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 2,
+    animation: false,
+    scales: {
+      x: { title: { display: true, text: '時間 (秒)' } },
+      y: { title: { display: true, text: '流量' }, min: 0 }
     }
+  }
+});
 
-    if (!window.__sb || !window.__sb.auth || typeof window.__sb.auth.signUp !== 'function') {
-      window.__sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
-    const sb = window.__sb;
+const observer = new ResizeObserver(() => { flowChart.resize(); });
+observer.observe(document.getElementById('chartBox'));
 
-    // ----------------------------
-    // 2) UI 工具函式
-    // ----------------------------
-    function clearMessages() {
-      ['login-message', 'register-message'].forEach(id => {
-        const el = document.getElementById(id);
-        el.textContent = '';
-        el.className = 'message';
-      });
-    }
+let serialPort, reader;
+let startTime = null;
+let flowRecords = [];
+let currentStep = 0;
+let flowData = [];
+let lastFlowTime = 0;
+let budldValue = null;
+let budldTimer = null;
 
-    function clearInputErrors() {
-      document.querySelectorAll('.input-error').forEach(el => (el.style.display = 'none'));
-      document.querySelectorAll('input').forEach(el => el.classList.remove('invalid'));
-    }
+function setStep(step) {
+  // 只允許步驟前進，不能倒退（避免同一行多個 Phase 訊息造成亂跳）
+  if (step <= currentStep && currentStep !== 0) return;
+  currentStep = step;
 
-    function showError(elementId, message) {
-      const el = document.getElementById(elementId);
-      el.textContent = message;
-      el.className = 'message error-message';
-    }
+  // 更新燈號
+  const lights = lightModes[step];
+  for (let i = 0; i < 3; i++) {
+    document.getElementById('light' + (i + 1)).className = 'light ' + lights[i];
+  }
 
-    function showWarn(elementId, message) {
-      const el = document.getElementById(elementId);
-      el.textContent = message;
-      el.className = 'message warn-message';
-    }
+  // 更新步驟圖片
+  const stepImages = document.getElementById('stepImages');
+  stepImages.innerHTML = '';
+  stepImages.style.display = (stepImagesData[step].length > 0) ? 'flex' : 'none';
+  stepImagesData[step].forEach(img => {
+    const box = document.createElement('div');
+    box.className = 'imgbox';
+    box.innerHTML = `<img src="${img.src}" alt="${img.alt}"><div class="caption">${img.caption}</div>`;
+    stepImages.appendChild(box);
+  });
 
-    function showSuccess(elementId, message) {
-      const el = document.getElementById(elementId);
-      el.textContent = message;
-      el.className = 'message success-message';
-    }
+  // step >= 2 就顯示圖表（修正：原本只有 step===3 才顯示）
+  document.getElementById('chartBox').style.display = (step >= 2 ? 'block' : 'none');
+  document.getElementById('lungsBox').style.display = 'none';
+  document.getElementById('instruction').innerHTML = instructions[step];
 
-    function showInputError(inputId, errorId, message) {
-      document.getElementById(inputId).classList.add('invalid');
-      const err = document.getElementById(errorId);
-      err.textContent = message;
-      err.style.display = 'block';
-    }
-
-    // 判斷是否為網路封鎖錯誤
-    function isNetworkError(err) {
-      const msg = err?.message || String(err);
-      return msg.includes('fetch') || msg.includes('Failed') || msg.includes('network') || msg.includes('ERR_NAME');
-    }
-
-    const NETWORK_BLOCK_MSG = '⚠️ 無法連線至伺服器\n可能原因：醫院網路封鎖了雲端連線\n\n請改用手機熱點後再試，\n或直接關閉此頁，使用「儲存資料」按鈕下載到本機（不需登入）。';
-
-    window.toggleForms = function toggleForms() {
-      document.getElementById('login-form').classList.toggle('hidden');
-      document.getElementById('register-form').classList.toggle('hidden');
-      clearMessages();
-      clearInputErrors();
-    };
-
-    // ----------------------------
-    // 3) 登入
-    // ----------------------------
-    document.getElementById('login-form').onsubmit = async function (e) {
-      e.preventDefault();
-      clearMessages();
-      clearInputErrors();
-
-      const email = document.getElementById('login-email').value.trim();
-      const password = document.getElementById('login-password').value;
-      const btn = document.getElementById('login-button');
-
-      if (!email) { showInputError('login-email', 'login-email-error', '請輸入電子郵件'); return; }
-      if (!password) { showInputError('login-password', 'login-password-error', '請輸入密碼'); return; }
-
-      btn.disabled = true;
-      btn.textContent = '登入中...';
-
-      try {
-        const { data, error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        showSuccess('login-message', '登入成功，正在跳轉...');
-        setTimeout(() => { window.location.href = '/'; }, 600);
-      } catch (err) {
-        if (isNetworkError(err)) {
-          showWarn('login-message', NETWORK_BLOCK_MSG);
-        } else {
-          showError('login-message', '登入失敗：' + (err?.message || err));
+  // 進入 step 3 後啟動 BUDLD 計算計時器
+  if (step === 3) {
+    if (budldTimer) clearInterval(budldTimer);
+    budldTimer = setInterval(() => {
+      if (Date.now() - lastFlowTime > 2500 && flowData.length > 0 && !budldValue) {
+        const result = calculateBUDLD();
+        if (result) {
+          budldValue = result;
+          document.getElementById('instruction').innerHTML =
+            `測試已完成<br>BUDLD: ${result.budld} µg<br>峰值流量: ${result.peakFlow} L/min<br>現在可儲存患者資料<br>如需重新使用請刷新頁面`;
+          showLungFill(parseFloat(result.budld));
         }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '登入';
+        clearInterval(budldTimer);
       }
-    };
+    }, 1000);
+  }
+}
 
-    // ----------------------------
-    // 4) 註冊
-    // ----------------------------
-    document.getElementById('register-form').onsubmit = async function (e) {
-      e.preventDefault();
-      clearMessages();
-      clearInputErrors();
+function showLungFill(budld) {
+  const percent = Math.max(0, Math.min(1, budld / 160));
+  document.getElementById('lungsBox').style.display = 'block';
+  document.getElementById('lungsFill').style.height = (percent * 100) + '%';
+  document.getElementById('lungsPercent').innerText = `${Math.round(percent * 100)}%`;
+}
 
-      const username = document.getElementById('register-username').value.trim();
-      const email = document.getElementById('register-email').value.trim();
-      const password = document.getElementById('register-password').value;
-      const btn = document.getElementById('register-button');
+document.getElementById("loginBtn").onclick = function() {
+  window.location.href = "login.html";
+};
 
-      if (!email) { showInputError('register-email', 'register-email-error', '請輸入電子郵件'); return; }
-      if (!password || password.length < 6) { showInputError('register-password', 'register-password-error', '密碼至少需要6個字符'); return; }
+document.getElementById('connectBtn').onclick = async function () {
+  document.getElementById('usbHint').style.display = 'none';
+  if (!('serial' in navigator)) {
+    alert('你的瀏覽器不支援 Web Serial API，請使用 Chrome 或 Edge。');
+    return;
+  }
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 9600 });
+    document.getElementById('status').innerText = "裝置已連接，等待資料...";
+    startTime = Date.now();
+    flowRecords = [];
+    flowData = [];
+    budldValue = null;
+    currentStep = 0;
+    setStep(0);
+    listenSerial();
+  } catch (e) {
+    document.getElementById('status').innerText = e.message;
+  }
+};
 
-      btn.disabled = true;
-      btn.textContent = '註冊中...';
+// ✅ 修正1：加入緩衝區，正確處理 \r\n 切行
+async function listenSerial() {
+  const decoder = new TextDecoderStream();
+  serialPort.readable.pipeTo(decoder.writable);
+  reader = decoder.readable.getReader();
 
-      try {
-        const { data, error } = await sb.auth.signUp({
-          email,
-          password,
-          options: { data: { display_name: username || null } }
-        });
-        if (error) throw error;
+  let buffer = "";
 
-        try {
-          if (data?.user?.id) {
-            const { error: profileError } = await sb.from('users').insert([{ id: data.user.id, username: username || null }]);
-            if (profileError) throw profileError;
-          }
-        } catch (profileErr) {
-          console.error('用戶資料寫入 users 表失敗（可忽略）：', profileErr);
-        }
-
-        showSuccess('register-message', '註冊成功！請檢查您的電子郵件以確認帳號');
-      } catch (err) {
-        if (isNetworkError(err)) {
-          showWarn('register-message', NETWORK_BLOCK_MSG);
-        } else {
-          showError('register-message', '註冊失敗：' + (err?.message || err));
-        }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '註冊';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value) {
+      buffer += value;
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // 最後不完整的留到下次
+      for (const line of lines) {
+        const clean = line.replace(/\r/g, '').trim();
+        if (clean) handleSerialLine(clean);
       }
-    };
+    }
+  }
+  reader.releaseLock();
+}
 
-    // ----------------------------
-    // 5) 即時驗證
-    // ----------------------------
-    document.getElementById('login-email').addEventListener('input', function () {
-      if (this.value) { this.classList.remove('invalid'); document.getElementById('login-email-error').style.display = 'none'; }
-    });
-    document.getElementById('login-password').addEventListener('input', function () {
-      if (this.value) { this.classList.remove('invalid'); document.getElementById('login-password-error').style.display = 'none'; }
-    });
-    document.getElementById('register-email').addEventListener('input', function () {
-      if (this.value) { this.classList.remove('invalid'); document.getElementById('register-email-error').style.display = 'none'; }
-    });
-    document.getElementById('register-password').addEventListener('input', function () {
-      if (this.value && this.value.length >= 6) { this.classList.remove('invalid'); document.getElementById('register-password-error').style.display = 'none'; }
-    });
-  </script>
+// ✅ 修正2：移除 return，讓同一行同時含 Phase 和 Flow 時都能被處理
+function handleSerialLine(line) {
+  if (line.includes("Phase 1 complete!"))  setStep(1);
+  if (line.includes("Phase 2 complete!!")) setStep(2);
+  if (line.includes("Phase 4 complete!!!")) setStep(3);
+
+  // 無論有沒有 Phase 訊息，都繼續檢查 Flow
+  const match = line.match(/Flow[:：]\s*([0-9.]+)/i);
+  if (match) {
+    if (currentStep < 2) setStep(2);
+
+    const flow = parseFloat(match[1]);
+    const now = ((Date.now() - startTime) / 1000).toFixed(2);
+    lastFlowTime = Date.now();
+    flowData.push([parseFloat(now), flow]);
+    document.getElementById('flowValue').innerText = flow.toFixed(2);
+
+    chartData.labels.push(now);
+    chartData.datasets[0].data.push(flow);
+    if (chartData.labels.length > 80) {
+      chartData.labels.shift();
+      chartData.datasets[0].data.shift();
+    }
+    flowChart.update();
+    flowRecords.push({ time: now, flow: flow });
+  }
+}
+
+function calculateBUDLD() {
+  if (flowData.length === 0) return null;
+
+  // 找出所有連續非零氣流段
+  let segments = [];
+  let start = null;
+  for (let i = 0; i < flowData.length; i++) {
+    if (flowData[i][1] > 0) {
+      if (start === null) start = i;
+    } else {
+      if (start !== null) { segments.push([start, i - 1]); start = null; }
+    }
+  }
+  if (start !== null) segments.push([start, flowData.length - 1]);
+  if (segments.length === 0) return null;
+
+  // 取總和最大的段
+  let maxSum = -Infinity, maxSegment = null;
+  for (const [segStart, segEnd] of segments) {
+    const segSum = flowData.slice(segStart, segEnd + 1).reduce((s, d) => s + d[1], 0);
+    if (segSum > maxSum) { maxSum = segSum; maxSegment = [segStart, segEnd]; }
+  }
+
+  const usedData = flowData.slice(maxSegment[0], maxSegment[1] + 1);
+  const sumFlow = usedData.reduce((s, d) => s + d[1], 0);
+  const peakFlow = Math.max(...usedData.map(d => d[1]));
+  const risingTime = usedData.length * 0.2;
+  const inhaledVolume = sumFlow * 0.2 / 60;
+
+  const budld = 160 * (
+    0.146661033
+    - 0.057608304 * risingTime
+    + 0.00475804  * peakFlow
+    + 0.077573091 * inhaledVolume
+  );
+
+  return {
+    budld: budld.toFixed(2),
+    peakFlow: peakFlow.toFixed(2),
+    risingTime: risingTime.toFixed(1)
+  };
+}
+
+async function saveData() {
+  const id   = document.getElementById('patientId').value.trim();
+  const name = document.getElementById('patientName').value.trim();
+
+  if (!id || !name) { alert("請輸入病患編號與身分證字號"); return; }
+
+  let content = `病患ID: ${id}\n身分證字號: ${name}\n\n`;
+  if (budldValue) {
+    content += `肺部沈積率 (BUDLD): ${budldValue.budld} µg\n`;
+    content += `峰值流量: ${budldValue.peakFlow} L/min\n`;
+    content += `上升時間: ${budldValue.risingTime} 秒\n\n`;
+  }
+  content += "時間(s)\t流量(L/min)\n";
+  flowData.forEach(([time, flow]) => { content += `${time}\t${flow.toFixed(2)}\n`; });
+
+  const now = new Date();
+  const datetime = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+  const fileName = `${name}_${datetime}.txt`;
+  const blob = new Blob([content], { type: "text/plain" });
+
+  // 本機下載（不需登入）
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // 登入後才上傳雲端
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  if (userError || !user) {
+    alert('已下載到本機；若要自動上傳到雲端，請先登入帳號。');
+    return;
+  }
+
+  const filePath = `${user.id}/${fileName}`;
+  const { error: uploadError } = await supabaseClient.storage.from('records').upload(filePath, blob);
+
+  if (uploadError) {
+    alert('已下載到本機，但上傳失敗：' + uploadError.message);
+  } else {
+    alert('已下載到本機，並上傳成功！檔案路徑：' + filePath);
+  }
+}
+
+document.getElementById('saveBtn').addEventListener('click', saveData);
+
+// 初始化
+setStep(0);
+checkLogin();
+supabaseClient.auth.onAuthStateChange(() => checkLogin());
+</script>
 </body>
 </html>
