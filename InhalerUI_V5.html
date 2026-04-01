@@ -143,7 +143,7 @@ const flowChart = new Chart(ctx, {
     animation: false,
     scales: {
       x: { title: { display: true, text: '時間 (秒)' } },
-      y: { title: { display: true, text: '流量' }, min: 0 }
+      y: { title: { display: true, text: '流量' }, min: 10 }
     }
   }
 });
@@ -189,11 +189,18 @@ function setStep(step) {
       if (Date.now() - lastFlowTime > 2500 && flowData.length > 0 && !budldValue) {
         const result = calculateBUDLD();
         if (result) {
-          budldValue = result;
-          document.getElementById('instruction').innerHTML =
-            `測試已完成<br>BUDLD: ${result.budld} µg<br>峰值流量: ${result.peakFlow} L/min<br>現在可儲存患者資料<br>如需重新使用請刷新頁面`;
-          showLungFill(parseFloat(result.budld));
-        }
+  budldValue = result;
+  const budldNum = parseFloat(result.budld);
+  if (budldNum < 5) {
+    document.getElementById('instruction').innerHTML =
+      `測試已完成<br>BUDLD: &lt;5 µg（偵測量過低）<br>峰值流量: ${result.peakFlow} L/min<br>現在可儲存患者資料<br>如需重新使用請刷新頁面`;
+    // 不顯示肺部動畫
+  } else {
+    document.getElementById('instruction').innerHTML =
+      `測試已完成<br>BUDLD: ${result.budld} µg<br>峰值流量: ${result.peakFlow} L/min<br>現在可儲存患者資料<br>如需重新使用請刷新頁面`;
+    showLungFill(budldNum);
+  }
+}
         clearInterval(budldTimer);
       }
     }, 1000);
