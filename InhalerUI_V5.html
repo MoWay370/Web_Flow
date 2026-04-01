@@ -326,22 +326,22 @@ function handleSerialLine(line) {
 
     const flow = parseFloat(match[1]);
 
-    // ✅ Flow <= NOISE_THRESHOLD 完全忽略，不顯示不記錄
-    if (flow <= NOISE_THRESHOLD) return;
+    // ✅ Flow <= NOISE_THRESHOLD 顯示為 0（不跳過，保留時間軸連續性）
+    const filteredFlow = flow <= NOISE_THRESHOLD ? 0 : flow;
 
     const now = ((Date.now() - startTime) / 1000).toFixed(2);
     lastFlowTime = Date.now();
-    flowData.push([parseFloat(now), flow]);
-    document.getElementById('flowValue').innerText = flow.toFixed(2);
+    flowData.push([parseFloat(now), filteredFlow]);
+    document.getElementById('flowValue').innerText = filteredFlow.toFixed(2);
 
     chartData.labels.push(now);
-    chartData.datasets[0].data.push(flow);
+    chartData.datasets[0].data.push(filteredFlow);
     if (chartData.labels.length > 80) {
       chartData.labels.shift();
       chartData.datasets[0].data.shift();
     }
-    flowChart.update();
-    flowRecords.push({ time: now, flow: flow });
+    flowChart.update('none');  // ✅ 跳過動畫，減少 lag
+    flowRecords.push({ time: now, flow: filteredFlow });
   }
 }
 
