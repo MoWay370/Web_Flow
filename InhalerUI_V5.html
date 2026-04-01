@@ -338,6 +338,7 @@ function handleSerialLine(line) {
     if (currentStep < 2) setStep(2);
 
     const flow = parseFloat(match[1]);
+    if (flow <= 10) return; // 忽略背景噪音
     const now = ((Date.now() - startTime) / 1000).toFixed(2);
     lastFlowTime = Date.now();
     flowData.push([parseFloat(now), flow]);
@@ -358,7 +359,7 @@ function calculateBUDLD() {
   if (flowData.length === 0) return null;
 
   // 只計算 flow > 20 的資料點（過濾背景噪音）
-  const FLOW_THRESHOLD = 20;
+  const FLOW_THRESHOLD = 10;
 
   let segments = [];
   let start = null;
